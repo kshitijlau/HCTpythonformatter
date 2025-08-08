@@ -22,7 +22,9 @@ def get_random_tips(repo_df, competency):
     # This line handles blank cells in the Competency Name column.
     repo_df.dropna(subset=['Competency Name'], inplace=True)
     
-    comp_df = repo_df[repo_df['Competency Name'].str.strip().str.lower() == competency.strip().str.lower()]
+    # --- FIXED: Corrected the line that caused the error ---
+    # The '.str' was removed from 'competency.strip().lower()'
+    comp_df = repo_df[repo_df['Competency Name'].str.strip().str.lower() == competency.strip().lower()]
     
     tips_70 = comp_df['70% Development Tips'].dropna().tolist()
     tips_20 = comp_df['20% Development Tips'].dropna().tolist()
@@ -109,7 +111,6 @@ with col1:
     st.header("Candidate Data")
     uploaded_candidates_file = st.file_uploader("1. Upload Candidate Data (Excel)", type=["xlsx"])
 
-    # --- NEW: Sample Candidate File Downloader ---
     @st.cache_data
     def create_sample_candidate_file():
         sample_data = {
@@ -127,7 +128,6 @@ with col1:
         label="📥 Download Sample Candidate File", data=create_sample_candidate_file(),
         file_name="sample_candidate_data.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-    # --- End of new section ---
 
 with col2:
     st.header("Tip Repository")
@@ -137,7 +137,6 @@ with col2:
         accept_multiple_files=True
     )
     
-    # --- NEW: Sample Repository File Downloaders ---
     @st.cache_data
     def create_sample_repo_file(level):
         """Creates a sample repository Excel file for a given level."""
@@ -164,7 +163,6 @@ with col2:
         label="📥 Download Sample 'Shape' Repo", data=create_sample_repo_file('Shape'),
         file_name="sample_repository_shape.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key='shape'
     )
-    # --- End of new section ---
 
 st.markdown("---")
 
