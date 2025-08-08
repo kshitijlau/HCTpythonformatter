@@ -19,6 +19,11 @@ def find_lowest_competencies(row, competencies):
 
 def get_random_tips(repo_df, competency):
     """Gets two random tips (70% and 20%) for a given competency."""
+    # --- MODIFIED: This line was added to handle blank cells ---
+    # It removes any rows where the 'Competency Name' column is empty.
+    repo_df.dropna(subset=['Competency Name'], inplace=True)
+    # --- End of modification ---
+    
     comp_df = repo_df[repo_df['Competency Name'].str.strip().str.lower() == competency.strip().str.lower()]
     
     tips_70 = comp_df['70% Development Tips'].dropna().tolist()
@@ -100,17 +105,14 @@ st.title("Development Plan Generator ⚙️")
 
 st.info("Upload your Excel files below. The app will generate a formatted Excel report.")
 
-# --- File Uploaders (MODIFIED FOR EXCEL) ---
 col1, col2 = st.columns(2)
 
 with col1:
     st.header("Candidate Data")
-    # MODIFIED: Expects a single Excel file for candidates
     uploaded_candidates_file = st.file_uploader("1. Upload Candidate Data (Excel)", type=["xlsx"])
 
 with col2:
     st.header("Tip Repository")
-    # MODIFIED: Expects three separate Excel files for the repository
     uploaded_repo_files = st.file_uploader(
         "2. Upload ALL THREE Tip Repositories (Apply, Guide, Shape Excel files)", 
         type=["xlsx"], 
@@ -119,9 +121,7 @@ with col2:
 
 st.markdown("---")
 
-# --- Main Processing Logic ---
 if st.button("Generate Development Reports", type="primary"):
-    # MODIFIED: Validation for Excel files
     if uploaded_candidates_file is None:
         st.error("⚠️ Please upload the Candidate Data Excel file.")
     elif len(uploaded_repo_files) != 3:
@@ -129,10 +129,8 @@ if st.button("Generate Development Reports", type="primary"):
     else:
         with st.spinner('Processing...'):
             try:
-                # MODIFIED: Reads candidate data from Excel
                 candidates_df = pd.read_excel(uploaded_candidates_file)
                 
-                # MODIFIED: Loads repositories from the three separate Excel files
                 repos = {}
                 for f in uploaded_repo_files:
                     if 'apply' in f.name.lower():
@@ -142,7 +140,6 @@ if st.button("Generate Development Reports", type="primary"):
                     elif 'shape' in f.name.lower():
                         repos['Shape'] = pd.read_excel(f)
                 
-                # Validation to ensure all 3 repos were identified
                 if len(repos) != 3:
                     st.error("❌ Could not identify 'Apply', 'Guide', and 'Shape' files from the filenames. Please ensure your uploaded Excel files contain these words.")
                     st.stop()
@@ -161,7 +158,7 @@ if st.button("Generate Development Reports", type="primary"):
                         st.warning(f"Skipping candidate {row['Candidate Name']}: level '{level}' not found.")
                         continue
                     
-                    repo_df = repos[level]
+                    repo_df = repos[level].copy() # Use a copy to avoid modifying the original dataframe
                     low_comp_1, low_comp_2 = find_lowest_competencies(row, COMPETENCIES)
                     
                     if not low_comp_1 or not low_comp_2:
