@@ -19,10 +19,8 @@ def find_lowest_competencies(row, competencies):
 
 def get_random_tips(repo_df, competency):
     """Gets two random tips (70% and 20%) for a given competency."""
-    # --- MODIFIED: This line was added to handle blank cells ---
-    # It removes any rows where the 'Competency Name' column is empty.
+    # This line handles blank cells in the Competency Name column.
     repo_df.dropna(subset=['Competency Name'], inplace=True)
-    # --- End of modification ---
     
     comp_df = repo_df[repo_df['Competency Name'].str.strip().str.lower() == competency.strip().str.lower()]
     
@@ -111,6 +109,26 @@ with col1:
     st.header("Candidate Data")
     uploaded_candidates_file = st.file_uploader("1. Upload Candidate Data (Excel)", type=["xlsx"])
 
+    # --- NEW: Sample Candidate File Downloader ---
+    @st.cache_data
+    def create_sample_candidate_file():
+        sample_data = {
+            'Candidate Name': ['John Doe', 'Jane Smith'], 'Level': ['Apply', 'Guide'],
+            'Manages Stakeholders': [2.5, 4.1], 'Steers Change': [3.1, 4.2], 'Leads People': [1.8, 4.8],
+            'Drives Results': [4.5, 3.2], 'Solves Challenges': [2.1, 4.3], 'Thinks Strategically': [3.3, 4.5]
+        }
+        df = pd.DataFrame(sample_data)
+        output = BytesIO()
+        df.to_excel(output, index=False, sheet_name='Candidates')
+        output.seek(0)
+        return output
+
+    st.download_button(
+        label="📥 Download Sample Candidate File", data=create_sample_candidate_file(),
+        file_name="sample_candidate_data.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    # --- End of new section ---
+
 with col2:
     st.header("Tip Repository")
     uploaded_repo_files = st.file_uploader(
@@ -118,6 +136,35 @@ with col2:
         type=["xlsx"], 
         accept_multiple_files=True
     )
+    
+    # --- NEW: Sample Repository File Downloaders ---
+    @st.cache_data
+    def create_sample_repo_file(level):
+        """Creates a sample repository Excel file for a given level."""
+        sample_data = {
+            'Competency Name': ['Manages Stakeholders', 'Manages Stakeholders', 'Leads People', 'Leads People', ''],
+            '70% Development Tips': [f'70% Tip A for {level}', f'70% Tip B for {level}', f'70% Tip C for {level}', f'70% Tip D for {level}', ''],
+            '20% Development Tips': [f'20% Tip X for {level}', f'20% Tip Y for {level}', f'20% Tip Z for {level}', f'20% Tip W for {level}', '']
+        }
+        df = pd.DataFrame(sample_data)
+        output = BytesIO()
+        df.to_excel(output, index=False, sheet_name=level)
+        output.seek(0)
+        return output
+
+    st.download_button(
+        label="📥 Download Sample 'Apply' Repo", data=create_sample_repo_file('Apply'),
+        file_name="sample_repository_apply.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key='apply'
+    )
+    st.download_button(
+        label="📥 Download Sample 'Guide' Repo", data=create_sample_repo_file('Guide'),
+        file_name="sample_repository_guide.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key='guide'
+    )
+    st.download_button(
+        label="📥 Download Sample 'Shape' Repo", data=create_sample_repo_file('Shape'),
+        file_name="sample_repository_shape.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key='shape'
+    )
+    # --- End of new section ---
 
 st.markdown("---")
 
@@ -158,7 +205,7 @@ if st.button("Generate Development Reports", type="primary"):
                         st.warning(f"Skipping candidate {row['Candidate Name']}: level '{level}' not found.")
                         continue
                     
-                    repo_df = repos[level].copy() # Use a copy to avoid modifying the original dataframe
+                    repo_df = repos[level].copy() 
                     low_comp_1, low_comp_2 = find_lowest_competencies(row, COMPETENCIES)
                     
                     if not low_comp_1 or not low_comp_2:
