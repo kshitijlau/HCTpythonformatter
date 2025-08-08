@@ -20,6 +20,8 @@ def find_lowest_competencies(row, competencies):
 
 def get_random_tips(repo_df, competency):
     """Gets two random tips (70% and 20%) for a given competency."""
+    # Ensure column names are stripped of whitespace for reliable matching
+    repo_df.columns = repo_df.columns.str.strip()
     comp_df = repo_df[repo_df['Competency Name'].str.strip().str.lower() == competency.strip().str.lower()]
     
     tips_70 = comp_df['70% Development Tips'].dropna().tolist()
@@ -107,119 +109,121 @@ def generate_formatted_excel(results):
 # --- STREAMLIT UI ---
 
 st.set_page_config(page_title="Development Plan Generator", layout="wide")
-st.title("Development Plan Generator")
+st.title("Development Plan Generator ⚙️")
 
-st.info("Upload the candidate data file and the three development tip repositories to generate the reports.")
+st.info("Upload the candidate data file and the development tip repository to generate the reports.")
 
-# Hardcoded competency list
-COMPETENCIES = [
-    'Manages Stakeholders', 'Steers Change', 'Leads People', 
-    'Drives Results', 'Solves Challenges', 'Thinks Strategically'
-]
+# --- File Uploaders ---
+col1, col2 = st.columns(2)
 
-uploaded_candidates_file = st.file_uploader("1. Upload Candidate Data (Excel)", type=["xlsx"])
+with col1:
+    st.header("Candidate Data")
+    uploaded_candidates_file = st.file_uploader("1. Upload Candidate Data", type=["xlsx"])
 
-# --- NEW: SAMPLE FILE DOWNLOADER ---
-@st.cache_data
-def create_sample_file():
-    """Creates an in-memory Excel file with sample data."""
-    sample_data = {
-        'Candidate Name': ['John Doe', 'Jane Smith'],
-        'Level': ['Apply', 'Guide'],
-        'Manages Stakeholders': [2, 5],
-        'Steers Change': [3, 4],
-        'Leads People': [1, 5],
-        'Drives Results': [4, 3],
-        'Solves Challenges': [2, 4],
-        'Thinks Strategically': [3, 5]
-    }
-    df = pd.DataFrame(sample_data)
-    output = BytesIO()
-    df.to_excel(output, index=False, sheet_name='Candidates')
-    output.seek(0)
-    return output
+    @st.cache_data
+    def create_sample_candidate_file():
+        sample_data = {
+            'Candidate Name': ['John Doe', 'Jane Smith'], 'Level': ['Apply', 'Guide'],
+            'Manages Stakeholders': [2.5, 4.1], 'Steers Change': [3.1, 4.2], 'Leads People': [1.8, 4.8],
+            'Drives Results': [4.5, 3.2], 'Solves Challenges': [2.1, 4.3], 'Thinks Strategically': [3.3, 4.5]
+        }
+        df = pd.DataFrame(sample_data)
+        output = BytesIO()
+        df.to_excel(output, index=False, sheet_name='Candidates')
+        output.seek(0)
+        return output
 
-st.download_button(
-    label="📥 Download Sample Candidate File",
-    data=create_sample_file(),
-    file_name="sample_candidate_data.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-)
-# --- END OF NEW SECTION ---
+    st.download_button(
+        label="📥 Download Sample Candidate File", data=create_sample_candidate_file(),
+        file_name="sample_candidate_data.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
+with col2:
+    st.header("Tip Repository")
+    # UPDATED: Changed from multiple CSVs to a single Excel file
+    uploaded_repo_file = st.file_uploader("2. Upload Tip Repository", type=["xlsx"])
+    
+    @st.cache_data
+    def create_sample_repo_file():
+        """Creates a sample repository Excel file with three sheets."""
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            for level in ['Apply', 'Guide', 'Shape']:
+                sample_data = {
+                    'Competency Name': ['Manages Stakeholders', 'Manages Stakeholders', 'Leads People', 'Leads People'],
+                    '70% Development Tips': [f'70% Tip A for {level}', f'70% Tip B for {level}', f'70% Tip C for {level}', f'70% Tip D for {level}'],
+                    '20% Development Tips': [f'20% Tip X for {level}', f'20% Tip Y for {level}', f'20% Tip Z for {level}', f'20% Tip W for {level}']
+                }
+                df = pd.DataFrame(sample_data)
+                df.to_excel(writer, sheet_name=level, index=False)
+        output.seek(0)
+        return output
+
+    st.download_button(
+        label="📥 Download Sample Repository File", data=create_sample_repo_file(),
+        file_name="sample_repository.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
 st.markdown("---")
 
-uploaded_repo_files = st.file_uploader(
-    "2. Upload ALL THREE Tip Repositories (Apply, Guide, Shape CSVs)", 
-    type=["csv"], 
-    accept_multiple_files=True
-)
-
-if st.button("Generate Development Reports"):
-    if uploaded_candidates_file is None:
-        st.error("Error: Please upload the candidate data file.")
-    elif len(uploaded_repo_files) != 3:
-        st.error("Error: Please upload all three repository files (Apply, Guide, and Shape).")
+# --- Main Processing Logic ---
+if st.button("Generate Development Reports", type="primary"):
+    # Input Validation
+    if uploaded_candidates_file is None or uploaded_repo_file is None:
+        st.error("⚠️ Please upload both the Candidate Data and the Tip Repository files.")
     else:
-        with st.spinner('Processing...'):
+        with st.spinner('Processing... This may take a moment.'):
             try:
                 candidates_df = pd.read_excel(uploaded_candidates_file)
+                
+                # UPDATED: Load repositories from the sheets of the single Excel file
+                st.write("Reading repository file...")
+                repos = {
+                    'Apply': pd.read_excel(uploaded_repo_file, sheet_name='Apply'),
+                    'Guide': pd.read_excel(uploaded_repo_file, sheet_name='Guide'),
+                    'Shape': pd.read_excel(uploaded_repo_file, sheet_name='Shape')
+                }
+                st.write("Repository loaded successfully!")
 
-                repos = {}
-                for f in uploaded_repo_files:
-                    if 'apply' in f.name.lower():
-                        repos['Apply'] = pd.read_csv(f)
-                    elif 'guide' in f.name.lower():
-                        repos['Guide'] = pd.read_csv(f)
-                    elif 'shape' in f.name.lower():
-                        repos['Shape'] = pd.read_csv(f)
-
-                if len(repos) != 3:
-                    st.error("Could not identify 'Apply', 'Guide', and 'Shape' files from the filenames. Please ensure filenames contain these words.")
-                    st.stop()
-
+                # List of expected competencies
+                COMPETENCIES = [
+                    'Manages Stakeholders', 'Steers Change', 'Leads People', 
+                    'Drives Results', 'Solves Challenges', 'Thinks Strategically'
+                ]
                 final_results = []
                 
                 for index, row in candidates_df.iterrows():
                     level = row['Level']
                     if level not in repos:
-                        st.warning(f"Warning: Skipping candidate {row['Candidate Name']} due to unknown level '{level}'.")
+                        st.warning(f"Skipping candidate {row['Candidate Name']}: level '{level}' not found in repository.")
                         continue
                     
                     repo_df = repos[level]
-                    
                     low_comp_1, low_comp_2 = find_lowest_competencies(row, COMPETENCIES)
                     
                     if not low_comp_1 or not low_comp_2:
-                        st.warning(f"Warning: Skipping candidate {row['Candidate Name']} because two lowest competencies could not be determined.")
+                        st.warning(f"Skipping candidate {row['Candidate Name']}: could not determine two lowest competencies.")
                         continue
                     
                     tip1_70, tip1_20 = get_random_tips(repo_df, low_comp_1)
                     tip2_70, tip2_20 = get_random_tips(repo_df, low_comp_2)
                     
                     final_results.append({
-                        "Candidate Name": row['Candidate Name'],
-                        "Level": level,
-                        "Lowest Competency 1": low_comp_1,
-                        "Tip 1 (70%)": tip1_70,
-                        "Tip 1 (20%)": tip1_20,
-                        "Lowest Competency 2": low_comp_2,
-                        "Tip 2 (70%)": tip2_70,
-                        "Tip 2 (20%)": tip2_20,
+                        "Candidate Name": row['Candidate Name'], "Level": level,
+                        "Lowest Competency 1": low_comp_1, "Tip 1 (70%)": tip1_70, "Tip 1 (20%)": tip1_20,
+                        "Lowest Competency 2": low_comp_2, "Tip 2 (70%)": tip2_70, "Tip 2 (20%)": tip2_20,
                     })
 
                 if final_results:
                     excel_data = generate_formatted_excel(final_results)
-                    st.success("Successfully generated reports!")
+                    st.success("✅ Success! Your development plans are ready for download.")
                     st.download_button(
-                        label="📥 Download Formatted Excel Report",
-                        data=excel_data,
+                        label="📥 Download Formatted Excel Report", data=excel_data,
                         file_name="Development_Plans.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
                 else:
-                    st.warning("No candidates were processed. Please check your input files.")
+                    st.warning("No candidates were processed. Please check your input files for valid data and levels.")
 
             except Exception as e:
-                st.error(f"An unexpected error occurred: {e}")
+                st.error(f"An error occurred. Please ensure your Excel repository has sheets named 'Apply', 'Guide', and 'Shape'. Error details: {e}")
